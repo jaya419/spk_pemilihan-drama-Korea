@@ -1,20 +1,19 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Criterion extends Model
+class Genre extends Model
 {
     use HasFactory;
 
-    protected $table = 'criterias';
+    protected $table = 'genres';
 
     protected $fillable = [
-        'name',
-        'type',
-        'weight',
+        'nama_genre',
+        'bobot',
+        'tipe',
     ];
 
     public function scores()

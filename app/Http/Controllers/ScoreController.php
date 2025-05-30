@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Alternative;
-use App\Models\Criterion;
+use App\Models\Drama;
+use App\Models\Genre;
 use App\Models\Score;
 use Illuminate\Http\Request;
 
@@ -11,34 +11,34 @@ class ScoreController extends Controller
 {
     public function index()
     {
-        $alternatives = Alternative::all();
-        $criterias = Criterion::all();
+        $dramas = Drama::all();
+        $genres = Genre::all();
         $scores = Score::all()->keyBy(function ($item) {
-            return $item->alternative_id . '-' . $item->criterion_id;
+            return $item->drama_id . '-' . $item->genre_id;
         });
 
-        return view('score.index', compact('alternatives', 'criterias', 'scores'));
+        return view('score.index', compact('dramas', 'genres', 'scores'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'alternative_ids' => 'required|array',
-            'alternative_ids.*' => 'exists:alternatives,id',
+            'drama_ids' => 'required|array',
+            'drama_ids.*' => 'exists:dramas,id',
             'value' => 'required|array',
             'value.*' => 'array',
-            'value.*.*' => 'required|numeric|min:0|max:100',
+            'value.*.*' => 'required|integer|min:0|max:100',
         ]);
 
-        foreach ($request->alternative_ids as $alternative_id) {
-            foreach ($request->value[$alternative_id] as $criterion_id => $val) {
+        foreach ($request->drama_ids as $drama_id) {
+            foreach ($request->value[$drama_id] as $genre_id => $val) {
                 Score::updateOrCreate(
                     [
-                        'alternative_id' => $alternative_id,
-                        'criterion_id' => $criterion_id,
+                        'drama_id' => $drama_id,
+                        'genre_id' => $genre_id,
                     ],
                     [
-                        'value' => $val,
+                        'skor' => $val,
                     ]
                 );
             }
@@ -48,100 +48,103 @@ class ScoreController extends Controller
     }
 
     public function calculateSAW()
-{
-    $alternatives = Alternative::all();
-    $criterias    = Criterion::all();
+    {
+        $dramas = Drama::all();
+        $genres = Genre::all();
 
-    if ($alternatives->isEmpty() || $criterias->isEmpty() || Score::count() === 0) {
-        $results = [];                       // kosong
+        if ($dramas->isEmpty() || $genres->isEmpty() || Score::count() === 0) {
+            $results = [];
+            return view('result.index', compact('results'));
+        }
+
+        $results = [];
+
+        foreach ($dramas as $drama) {
+            $total = 0;
+
+            foreach ($genres as $genre) {
+                $score = Score::where('drama_id', $drama->id)
+                              ->where('genre_id', $genre->id)
+                              ->first();
+
+                $value = $score ? $score->skor : 0;
+
+                if ($genre->tipe === 'benefit') {
+                    $max = Score::where('genre_id', $genre->id)->max('skor') ?: 1;
+                    $normalized = $max > 0 ? $value / $max : 0;
+                } else {
+                    $min = Score::where('genre_id', $genre->id)->min('skor') ?: 1;
+                    $normalized = $value > 0 ? $min / $value : 0;
+                }
+
+                $weight = $genre->bobot;
+                $total += $normalized * $weight;
+            }
+
+            $results[] = [
+                'drama' => $drama->nama_drama,
+                'score' => round($total * 100, 2),
+            ];
+        }
+
+        usort($results, fn ($a, $b) => $b['score'] <=> $a['score']);
+
         return view('result.index', compact('results'));
     }
 
-    $results = [];
-
-    foreach ($alternatives as $alternative) {
-        $total = 0;
-
-        foreach ($criterias as $criterion) {
-            $score = Score::where('alternative_id', $alternative->id)
-                          ->where('criterion_id', $criterion->id)
-                          ->first();
-
-            $value = $score ? $score->value : 0;
-
-            if ($criterion->type === 'benefit') {
-                $max = Score::where('criterion_id', $criterion->id)->max('value') ?: 1;
-                $normalized = $max > 0 ? $value / $max : 0;
-            } else {                                            // type == cost
-                $min = Score::where('criterion_id', $criterion->id)->min('value') ?: 1;
-                $normalized = $value > 0 ? $min / $value : 0;
-            }
-
-            $weight = $criterion->weight / 100;
-            $total += $normalized * $weight;
-        }
-
-        $results[] = [
-            'alternative' => $alternative->name,
-            'score'       => round($total * 100, 2),
-        ];
-    }
-
-    usort($results, fn ($a, $b) => $b['score'] <=> $a['score']);
-
-    return view('result.index', compact('results'));
-}
-
-
     public function dashboard()
     {
-        $alternativeCount = Alternative::count();
-        $criterionCount = Criterion::count();
+        $dramaCount = Drama::count();
+        $genreCount = Genre::count();
         $scoreCount = Score::count();
 
         $latestScore = Score::latest()->first();
-        $latestCriterion = Criterion::latest()->first();
-        $latestAlternative = Alternative::latest()->first();
+        $latestGenre = Genre::latest()->first();
+        $latestDrama = Drama::latest()->first();
 
-        $alternatives = Alternative::all();
-        $criterias = Criterion::all();
+        $dramas = Drama::all();
+        $genres = Genre::all();
         $sawResults = [];
 
-        if ($alternatives->isNotEmpty() && $criterias->isNotEmpty()) {
-            foreach ($alternatives as $alternative) {
+        if ($dramas->isNotEmpty() && $genres->isNotEmpty()) {
+            foreach ($dramas as $drama) {
                 $total = 0;
-                foreach ($criterias as $criterion) {
-                    $score = Score::where('alternative_id', $alternative->id)
-                                   ->where('criterion_id', $criterion->id)
-                                   ->first();
-                    $value = $score ? $score->value : 0;
+                foreach ($genres as $genre) {
+                    $score = Score::where('drama_id', $drama->id)
+                                  ->where('genre_id', $genre->id)
+                                  ->first();
 
-                    $max = Score::where('criterion_id', $criterion->id)->max('value') ?: 1;
-                    $min = Score::where('criterion_id', $criterion->id)->min('value') ?: 1;
+                    $value = $score ? $score->skor : 0;
 
-                    if ($criterion->type === 'benefit') {
+                    $max = Score::where('genre_id', $genre->id)->max('skor') ?: 1;
+                    $min = Score::where('genre_id', $genre->id)->min('skor') ?: 1;
+
+                    if ($genre->tipe === 'benefit') {
                         $normalized = $max > 0 ? $value / $max : 0;
                     } else {
                         $normalized = $value > 0 ? $min / $value : 0;
                     }
 
-                    $weight = $criterion->weight / 100;
+                    $weight = $genre->bobot;
                     $total += $normalized * $weight;
                 }
+
                 $sawResults[] = [
-                    'alternative' => $alternative->name,
+                    'drama' => $drama->nama_drama,
                     'score' => round($total * 100, 2),
                 ];
             }
+
             usort($sawResults, fn($a, $b) => $b['score'] <=> $a['score']);
         }
-        $top3RankedAlternatives = array_slice($sawResults, 0, 3);
 
-        $newlyAddedAlternatives = Alternative::latest()->take(3)->get();
+        $top3RankedDramas = array_slice($sawResults, 0, 3);
+        $newlyAddedDramas = Drama::latest()->take(3)->get();
+
         return view('dashboard.index', compact(
-            'alternativeCount', 'criterionCount', 'scoreCount',
-            'latestScore', 'latestCriterion', 'latestAlternative',
-            'top3RankedAlternatives', 'newlyAddedAlternatives'
+            'dramaCount', 'genreCount', 'scoreCount',
+            'latestScore', 'latestGenre', 'latestDrama',
+            'top3RankedDramas', 'newlyAddedDramas'
         ));
     }
 }

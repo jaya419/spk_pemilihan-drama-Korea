@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,19 +8,21 @@ class Score extends Model
 {
     use HasFactory;
 
+    protected $table = 'scores';
+
     protected $fillable = [
-        'alternative_id',
-        'criterion_id',
-        'value',
+        'drama_id',
+        'genre_id',
+        'skor',
     ];
 
-    public function alternative()
+    public function drama()
     {
-        return $this->belongsTo(Alternative::class);
+        return $this->belongsTo(Drama::class);
     }
 
-    public function criterion()
+    public function genre()
     {
-        return $this->belongsTo(Criterion::class);
+        return $this->belongsTo(Genre::class);
     }
 }

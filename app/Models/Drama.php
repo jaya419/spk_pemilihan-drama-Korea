@@ -1,24 +1,22 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Alternative extends Model
+class Drama extends Model
 {
     use HasFactory;
 
+    protected $table = 'dramas';
+
     protected $fillable = [
-        'name',
-        'address',
-        'contact',
-        'description',
-        'open_hour',
-        'close_hour',
+        'nama_drama',
+        'deskripsi',
+        'tahun',
+        'poster',
     ];
 
-    // Relasi ke scores
     public function scores()
     {
         return $this->hasMany(Score::class);
